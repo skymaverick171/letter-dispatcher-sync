@@ -1533,6 +1533,9 @@
       attachAddBtn: "Add files",
       attachEmptyHint: "No files selected.",
       attachManualHint: "Files can't be attached automatically — once your letter opens, attach them there yourself.",
+      attachConfirmTitle: "Attach your files first",
+      attachConfirmText: "Once your mail app opens, you'll need to attach these files yourself — browsers can't do this automatically: {files}\n\nCan't find one? Use the Download button next to it above to save a fresh copy to your Downloads folder.",
+      attachConfirmBtn: "Continue",
       attachDownloadBtn: "Download",
       attachRemoveLabel: "Remove",
       attachReminderMsg: "Don't forget to attach: {files}",
@@ -1747,6 +1750,9 @@
       attachAddBtn: "Ajouter des fichiers",
       attachEmptyHint: "Aucun fichier sélectionné.",
       attachManualHint: "Les fichiers ne peuvent pas être joints automatiquement — une fois la lettre ouverte, joignez-les vous-même.",
+      attachConfirmTitle: "Joignez d'abord vos fichiers",
+      attachConfirmText: "Une fois votre application de messagerie ouverte, vous devrez joindre ces fichiers vous-même — les navigateurs ne peuvent pas le faire automatiquement : {files}\n\nVous ne le retrouvez pas ? Utilisez le bouton Télécharger à côté de son nom ci-dessus pour en récupérer une copie dans votre dossier Téléchargements.",
+      attachConfirmBtn: "Continuer",
       attachDownloadBtn: "Télécharger",
       attachRemoveLabel: "Retirer",
       attachReminderMsg: "N'oubliez pas de joindre : {files}",
@@ -4057,6 +4063,23 @@
     return '<div class="status-msg warn">' + esc(t("attachReminderMsg").replace("{files}", names)) + '</div>';
   }
 
+  // Blocking confirmation shown right before handing off to the mail app —
+  // the small inline warning below the Send button (attachmentReminderHtml,
+  // still shown afterward too) is easy to miss once focus has already
+  // switched to the external mail app/window, so this catches it first,
+  // while the person is still looking at this page. Resolves true
+  // immediately (no modal) when there's nothing attached.
+  function confirmAttachmentsIfAny() {
+    if (!state.composeAttachments.length) return Promise.resolve(true);
+    var names = state.composeAttachments.map(function (a) { return a.file.name; }).join(", ");
+    return showConfirmModal({
+      title: t("attachConfirmTitle"),
+      text: t("attachConfirmText").replace("{files}", names),
+      saveLabel: t("attachConfirmBtn"),
+      discardLabel: t("confirmCancelBtn")
+    });
+  }
+
   $("#attachmentAddBtn").addEventListener("click", function () { $("#attachmentInput").click(); });
   $("#attachmentInput").addEventListener("change", function () {
     Array.prototype.slice.call(this.files).forEach(function (file) {
@@ -4151,31 +4174,34 @@
       status.innerHTML = '<div class="status-msg warn">' + esc(t("selectRecipientWarn")) + '</div>';
       return;
     }
-    var ccStr = getCc(), bccStr = getBcc();
-    var app = state.mailApp;
-    if (MAIL_APPS_WEB[app]) {
-      if (personalize) {
-        recipients.forEach(function (r, i) {
-          setTimeout(function () {
-            openExternalUrl(buildWebComposeUrl(app, r.email, substitute(subject, r), substitute(body, r), ccStr, bccStr));
-          }, i * 350);
-        });
-        status.innerHTML = '<div class="status-msg">' + esc(tn("openingWindowsMsg", recipients.length)) + '</div>' + attachmentReminderHtml();
+    confirmAttachmentsIfAny().then(function (proceed) {
+      if (!proceed) return;
+      var ccStr = getCc(), bccStr = getBcc();
+      var app = state.mailApp;
+      if (MAIL_APPS_WEB[app]) {
+        if (personalize) {
+          recipients.forEach(function (r, i) {
+            setTimeout(function () {
+              openExternalUrl(buildWebComposeUrl(app, r.email, substitute(subject, r), substitute(body, r), ccStr, bccStr));
+            }, i * 350);
+          });
+          status.innerHTML = '<div class="status-msg">' + esc(tn("openingWindowsMsg", recipients.length)) + '</div>' + attachmentReminderHtml();
+        } else {
+          var to = recipients.map(function (r) { return r.email; }).join(",");
+          openExternalUrl(buildWebComposeUrl(app, to, subject, body, ccStr, bccStr));
+          status.innerHTML = '<div class="status-msg">' + esc(tn("openingOneMsg", recipients.length)) + '</div>' + attachmentReminderHtml();
+        }
       } else {
-        var to = recipients.map(function (r) { return r.email; }).join(",");
-        openExternalUrl(buildWebComposeUrl(app, to, subject, body, ccStr, bccStr));
-        status.innerHTML = '<div class="status-msg">' + esc(tn("openingOneMsg", recipients.length)) + '</div>' + attachmentReminderHtml();
+        // Local-app handoff (default/Outlook desktop/Spark/Airmail): always
+        // one combined message to every recipient, same as this app's "Open
+        // in mail app" has always done — a page can't reliably fire off N
+        // separate mailto:/custom-scheme handoffs in a row the way it can
+        // open N browser tabs.
+        var toAll = recipients.map(function (r) { return r.email; }).join(",");
+        window.location.href = buildMailAppUrl(app, toAll, subject, body, ccStr, bccStr);
+        status.innerHTML = '<div class="status-msg">' + esc(t("openedMailAppMsg")) + '</div>' + attachmentReminderHtml();
       }
-    } else {
-      // Local-app handoff (default/Outlook desktop/Spark/Airmail): always
-      // one combined message to every recipient, same as this app's "Open
-      // in mail app" has always done — a page can't reliably fire off N
-      // separate mailto:/custom-scheme handoffs in a row the way it can
-      // open N browser tabs.
-      var toAll = recipients.map(function (r) { return r.email; }).join(",");
-      window.location.href = buildMailAppUrl(app, toAll, subject, body, ccStr, bccStr);
-      status.innerHTML = '<div class="status-msg">' + esc(t("openedMailAppMsg")) + '</div>' + attachmentReminderHtml();
-    }
+    });
   });
 
   function closeMailtoPopover() {
