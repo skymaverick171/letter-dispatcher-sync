@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Установка Letter Dispatcher Sync</title>
+<style>
+  :root {
+    --bg: #f2f4f1;
+    --surface: #ffffff;
+    --surface-2: #eceee9;
+    --ink: #1f2a24;
+    --muted: #5c6a63;
+    --border: #d9ddd4;
+    --accent: #1e4b8f;
+    --accent-ink: #ffffff;
+    --accent-soft: #e3eaf6;
+    --stamp: #b23a3a;
+    --stamp-soft: #f4e2e2;
+    --good: #2f7a4f;
+    --good-soft: #e3f1e8;
+    --shadow: 0 1px 2px rgba(31,42,36,0.06), 0 8px 24px -12px rgba(31,42,36,0.18);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14181a; --surface: #1b2124; --surface-2: #222a2d; --ink: #e7ebe6;
+      --muted: #9aa89f; --border: #333d3f; --accent: #7aa6e6; --accent-ink: #0f1a2b;
+      --accent-soft: #223349; --stamp: #e08a8a; --stamp-soft: #3a2626; --good: #79c795;
+      --good-soft: #1e2f24; --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14181a; --surface: #1b2124; --surface-2: #222a2d; --ink: #e7ebe6;
+    --muted: #9aa89f; --border: #333d3f; --accent: #7aa6e6; --accent-ink: #0f1a2b;
+    --accent-soft: #223349; --stamp: #e08a8a; --stamp-soft: #3a2626; --good: #79c795;
+    --good-soft: #1e2f24; --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 15.5px; line-height: 1.6;
+  }
+  .stripe {
+    height: 6px;
+    background: repeating-linear-gradient(-45deg,
+      var(--accent) 0 14px, var(--surface) 14px 20px,
+      var(--stamp) 20px 34px, var(--surface) 34px 40px);
+  }
+  .shell { max-width: 760px; margin: 0 auto; padding: 40px 24px 80px; }
+  .top-row { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+  .lang-switch {
+    display: flex; gap: 2px; background: var(--surface-2); padding: 3px;
+    border-radius: 8px;
+  }
+  .lang-switch button {
+    font: inherit; font-family: "IBM Plex Mono", monospace; font-size: 11.5px;
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;
+    padding: 5px 9px; border-radius: 6px; border: none; background: transparent;
+    color: var(--muted); cursor: pointer;
+  }
+  .lang-switch button.active { background: var(--surface); color: var(--accent); box-shadow: var(--shadow); }
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; font-weight: 500;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--stamp);
+  }
+  h1 {
+    font-family: "Fraunces", Georgia, serif; font-weight: 600;
+    font-size: clamp(28px, 5vw, 40px); line-height: 1.1; margin: 10px 0 14px;
+    text-wrap: balance;
+  }
+  .lede { color: var(--muted); max-width: 58ch; margin: 0 0 26px; }
+  .cta-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    font: inherit; font-weight: 600; font-size: 14.5px;
+    padding: 10px 16px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--ink); text-decoration: none;
+    cursor: pointer;
+  }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  section { margin-top: 42px; }
+  h2 {
+    display: flex; align-items: baseline; gap: 12px;
+    font-family: "Fraunces", Georgia, serif; font-weight: 600;
+    font-size: 22px; margin: 0 0 6px; text-wrap: balance;
+  }
+  h2 .num {
+    font-family: "IBM Plex Mono", monospace; font-size: 13px; font-weight: 500;
+    color: var(--accent); background: var(--accent-soft);
+    padding: 2px 7px; border-radius: 5px; flex: none;
+  }
+  .section-intro { color: var(--muted); margin: 0 0 16px; max-width: 60ch; }
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; box-shadow: var(--shadow); padding: 20px 22px;
+  }
+  .panel + .panel { margin-top: 14px; }
+  .platform-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 15px; font-weight: 600; margin-bottom: 14px;
+  }
+  .platform-badge .icon {
+    width: 26px; height: 26px; display: inline-flex; align-items: center;
+    justify-content: center; border-radius: 6px; background: var(--accent-soft);
+    color: var(--accent); flex: none;
+  }
+  ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: step; }
+  ol.steps li {
+    counter-increment: step; position: relative;
+    padding: 0 0 0 34px; margin-bottom: 14px;
+  }
+  ol.steps li:last-child { margin-bottom: 0; }
+  ol.steps li::before {
+    content: counter(step);
+    position: absolute; left: 0; top: 1px;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--muted); font-family: "IBM Plex Mono", monospace;
+    font-size: 12px; font-weight: 500; display: flex;
+    align-items: center; justify-content: center;
+  }
+  .hint { color: var(--muted); font-size: 13.5px; margin: 4px 0 0; }
+  .callout {
+    border-radius: 8px; padding: 14px 16px; font-size: 14px;
+  }
+  .callout.info { background: var(--accent-soft); color: var(--ink); }
+  .callout.info .eyebrow { color: var(--accent); }
+  .callout p { margin: 6px 0 0; }
+  footer {
+    margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--border);
+    color: var(--muted); font-size: 13px;
+    font-family: "IBM Plex Mono", monospace;
+  }
+  @media (max-width: 520px) {
+    .shell { padding: 28px 18px 64px; }
+  }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+</head>
+<body>
+<div class="stripe"></div>
+<div class="shell">
+  <div class="top-row">
+    <div class="lang-switch" id="langSwitch">
+      <button data-lang="ru">RU</button>
+      <button data-lang="en">EN</button>
+      <button data-lang="fr">FR</button>
+    </div>
+  </div>
+  <header>
+    <div class="eyebrow">Letter Dispatcher Sync</div>
+    <h1 id="tH1">Установка на телефон и компьютер</h1>
+    <p class="lede" id="tLede">Letter Dispatcher Sync — обычная веб-страница, но её можно «поставить» как настоящее приложение: иконка на рабочем столе или экране «Домой», отдельное окно без адресной строки браузера. Ниже — как это сделать на каждой системе, плюс шаблоны и настройка синхронизации с Google Sheets.</p>
+    <div class="cta-row">
+      <a class="btn primary" href="https://skymaverick171.github.io/letter-dispatcher-sync/" target="_blank" rel="noopener">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        <span id="tCta">Открыть Letter Dispatcher Sync</span>
+      </a>
+    </div>
+  </header>
+
+  <div class="callout info">
+    <div class="eyebrow" id="tWhyEyebrow">Зачем вообще ставить</div>
+    <p id="tWhyText">Ничего не меняется в самом приложении — просто быстрый доступ одним тапом/кликом, своё окно и иконка, как у обычной программы. Данные остаются точно теми же, что и в браузере — это одна и та же страница.</p>
+  </div>
+
+  <section>
+    <h2><span class="num">01</span> <span id="tH2Windows">Windows</span></h2>
+    <p class="section-intro" id="tIntroWindows">В Chrome или Edge — родная функция браузера «Установить как приложение».</p>
+    <div class="panel">
+      <div class="platform-badge">
+        <span class="icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        </span>
+        Chrome / Edge
+      </div>
+      <ol class="steps" id="stepsWindows"></ol>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">02</span> Android</h2>
+    <p class="section-intro" id="tIntroAndroid">Через Chrome — почти как на компьютере.</p>
+    <div class="panel">
+      <div class="platform-badge">
+        <span class="icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+        </span>
+        <span id="tAndroidBadge">Chrome для Android</span>
+      </div>
+      <ol class="steps" id="stepsAndroid"></ol>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">03</span> <span id="tH2Ios">iPhone / iPad</span></h2>
+    <p class="section-intro" id="tIntroIos">В Safari нет автоматической кнопки — это ограничение самого iOS, но добавляется вручную за несколько секунд.</p>
+    <div class="panel">
+      <div class="platform-badge">
+        <span class="icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 5h2"/></svg>
+        </span>
+        Safari
+      </div>
+      <ol class="steps" id="stepsIos"></ol>
+      <p class="hint" id="tHintIos">Внутри самого приложения тоже есть подсказка с этими же шагами — на случай, если забудется.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">04</span> <span id="tH2Sheets">Шаблон для Google Sheets</span></h2>
+    <p class="section-intro" id="tIntroSheets">Готовая таблица для быстрого импорта контактов — с нужными столбцами и примером заполнения.</p>
+    <div class="panel">
+      <div class="cta-row" style="margin-bottom: 0;">
+        <a class="btn primary" href="https://skymaverick171.github.io/letter-dispatcher-sync/docs/google-sheets-template/Letter_Dispatcher_Contacts_Template.xlsx" download>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v13m0 0-4-4m4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+          <span id="tSheetsBtn">Скачать шаблон (.xlsx)</span>
+        </a>
+      </div>
+      <p class="hint" id="tSheetsHint">Скачай файл, затем открой в Google Таблицах: «Файл» → «Импорт» → «Загрузить» — или просто открой его в Excel.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">05</span> <span id="tH2LettersSheets">Шаблон писем для Google Sheets</span></h2>
+    <p class="section-intro" id="tIntroLettersSheets">Таблица для готовых писем: тема, текст, Cc/Bcc и персонализация — тоже импортируется в приложение в один клик.</p>
+    <div class="panel">
+      <div class="cta-row" style="margin-bottom: 0;">
+        <a class="btn primary" href="https://skymaverick171.github.io/letter-dispatcher-sync/docs/google-sheets-template/Letter_Dispatcher_Letters_Template.xlsx" download>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v13m0 0-4-4m4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+          <span id="tLettersSheetsBtn">Скачать шаблон (.xlsx)</span>
+        </a>
+      </div>
+      <p class="hint" id="tLettersSheetsHint">Скачай файл, заполни лист «Letters», затем во вкладке Letters приложения нажми «Import from Google Sheets».</p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">06</span> <span id="tH2SyncSetup">Настройка синхронизации</span></h2>
+    <p class="section-intro" id="tIntroSyncSetup">Привязка к своей Google-таблице (Client ID, ID таблицы, диапазоны, права на запись) — отдельная пошаговая инструкция, чуть длиннее, чем помещается на этой странице.</p>
+    <div class="panel">
+      <div class="cta-row" style="margin-bottom: 0;">
+        <a class="btn primary" id="syncSetupLink" href="https://github.com/skymaverick171/letter-dispatcher-sync/blob/main/README.en.md" target="_blank" rel="noopener">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6M9 11h6M9 19h3"/></svg>
+          <span id="tSyncSetupBtn">Открыть инструкцию по настройке</span>
+        </a>
+      </div>
+      <p class="hint" id="tSyncSetupHint">Инструкция пока доступна на английском и французском (README.en.md / README.fr.md в репозитории).</p>
+    </div>
+  </section>
+
+  <footer id="tFooter">Letter Dispatcher Sync · установка на Windows / Android / iOS</footer>
+</div>
+
+<script>
+(function () {
+  var I18N = {
+    ru: {
+      h1: "Установка на телефон и компьютер",
+      lede: "Letter Dispatcher — обычная веб-страница, но её можно «поставить» как настоящее приложение: иконка на рабочем столе или экране «Домой», отдельное окно без адресной строки браузера. Ниже — как это сделать на каждой системе.",
+      cta: "Открыть Letter Dispatcher Sync",
+      whyEyebrow: "Зачем вообще ставить",
+      whyText: "Ничего не меняется в самом приложении — просто быстрый доступ одним тапом/кликом, своё окно и иконка, как у обычной программы. Данные остаются точно теми же, что и в браузере — это одна и та же страница.",
+      h2Windows: "Windows",
+      introWindows: "В Chrome или Edge — родная функция браузера «Установить как приложение».",
+      stepsWindows: [
+        "Открыть ссылку на Letter Dispatcher.",
+        "Внутри приложения (шапка сверху) нажать кнопку <strong>«Install app»</strong> — она появляется сама, когда браузер готов установить страницу.",
+        "Если кнопки не видно — в адресной строке справа есть значок ⊕ / экрана с стрелкой («Установить»); либо через меню браузера (⋮) → <strong>«Установить Letter Dispatcher…»</strong>.",
+        "Подтвердить — иконка появится на рабочем столе и в меню «Пуск»."
+      ],
+      introAndroid: "Через Chrome — почти как на компьютере.",
+      androidBadge: "Chrome для Android",
+      stepsAndroid: [
+        "Открыть ссылку на Letter Dispatcher в Chrome.",
+        "Нажать кнопку <strong>«Install app»</strong> в шапке приложения — или открыть меню Chrome (⋮) и выбрать <strong>«Установить приложение»</strong> / <strong>«Добавить на главный экран»</strong>.",
+        "Подтвердить в появившемся окне.",
+        "Иконка появится на главном экране и в списке приложений — открывается в своём окне, без адресной строки."
+      ],
+      h2Ios: "iPhone / iPad",
+      introIos: "В Safari нет автоматической кнопки — это ограничение самого iOS, но добавляется вручную за несколько секунд.",
+      stepsIos: [
+        "Открыть ссылку на Letter Dispatcher <strong>именно в Safari</strong> (в Chrome/другом браузере на iOS этот пункт меню не работает).",
+        "Нажать значок <strong>«Поделиться»</strong> (квадрат со стрелкой вверх) внизу экрана.",
+        "В списке действий выбрать <strong>«На экран «Домой»»</strong> (Add to Home Screen) — возможно, придётся пролистать список вниз.",
+        "Нажать <strong>«Добавить»</strong> в правом верхнем углу."
+      ],
+      hintIos: "Внутри самого приложения тоже есть подсказка с этими же шагами — на случай, если забудется.",
+      h2Sheets: "Шаблон для Google Sheets",
+      introSheets: "Готовая таблица для быстрого импорта контактов — с нужными столбцами и примером заполнения.",
+      sheetsBtn: "Скачать шаблон (.xlsx)",
+      sheetsHint: "Скачай файл, затем открой в Google Таблицах: «Файл» → «Импорт» → «Загрузить» — или просто открой его в Excel.",
+      h2LettersSheets: "Шаблон писем для Google Sheets",
+      introLettersSheets: "Таблица для готовых писем: тема, текст, Cc/Bcc и персонализация — тоже импортируется в приложение в один клик.",
+      lettersSheetsBtn: "Скачать шаблон (.xlsx)",
+      lettersSheetsHint: "Скачай файл, заполни лист «Letters», затем во вкладке Letters приложения нажми «Import from Google Sheets».",
+      h2SyncSetup: "Настройка синхронизации",
+      introSyncSetup: "Привязка к своей Google-таблице (Client ID, ID таблицы, диапазоны, права на запись) — отдельная пошаговая инструкция, чуть длиннее, чем помещается на этой странице.",
+      syncSetupBtn: "Открыть инструкцию по настройке",
+      syncSetupHint: "Инструкция пока доступна на английском и французском (README.en.md / README.fr.md в репозитории).",
+      syncSetupHref: "https://github.com/skymaverick171/letter-dispatcher-sync/blob/main/README.en.md",
+      footer: "Letter Dispatcher Sync · установка на Windows / Android / iOS"
+    },
+    en: {
+      h1: "Installing on your phone and computer",
+      lede: "Letter Dispatcher is an ordinary web page, but it can be \"installed\" like a real app: an icon on your desktop or home screen, its own window with no address bar. Here's how, for each system.",
+      cta: "Open Letter Dispatcher Sync",
+      whyEyebrow: "Why bother installing",
+      whyText: "Nothing changes in the app itself — it's just one-tap/one-click access, its own window and icon, like a regular program. The data stays exactly the same as in the browser — it's the same page.",
+      h2Windows: "Windows",
+      introWindows: "In Chrome or Edge — the browser's own built-in \"Install as app\" feature.",
+      stepsWindows: [
+        "Open the Letter Dispatcher link.",
+        "Inside the app (top header) click the <strong>\"Install app\"</strong> button — it appears on its own once the browser judges the page installable.",
+        "Don't see the button? Look for the ⊕ / screen-with-arrow icon on the right of the address bar, or the browser menu (⋮) → <strong>\"Install Letter Dispatcher…\"</strong>.",
+        "Confirm — an icon appears on the desktop and in the Start menu."
+      ],
+      introAndroid: "Via Chrome — almost the same as on a computer.",
+      androidBadge: "Chrome for Android",
+      stepsAndroid: [
+        "Open the Letter Dispatcher link in Chrome.",
+        "Tap the <strong>\"Install app\"</strong> button in the app's header — or open the Chrome menu (⋮) and choose <strong>\"Install app\"</strong> / <strong>\"Add to Home screen\"</strong>.",
+        "Confirm in the dialog that appears.",
+        "An icon appears on the home screen and in the app list — it opens in its own window, with no address bar."
+      ],
+      h2Ios: "iPhone / iPad",
+      introIos: "Safari has no automatic button for this — a limitation of iOS itself — but it takes only a few seconds to add manually.",
+      stepsIos: [
+        "Open the Letter Dispatcher link <strong>in Safari specifically</strong> (this menu item doesn't work in Chrome or another browser on iOS).",
+        "Tap the <strong>Share</strong> icon (a square with an arrow pointing up) at the bottom of the screen.",
+        "From the list of actions choose <strong>\"Add to Home Screen\"</strong> — you may need to scroll down.",
+        "Tap <strong>\"Add\"</strong> in the top-right corner."
+      ],
+      hintIos: "The app itself also shows this same hint, in case you forget.",
+      h2Sheets: "Contacts template for Google Sheets",
+      introSheets: "A ready-made spreadsheet for quickly importing contacts — with the right columns and a sample row.",
+      sheetsBtn: "Download template (.xlsx)",
+      sheetsHint: "Download the file, then open it in Google Sheets: \"File\" → \"Import\" → \"Upload\" — or just open it in Excel.",
+      h2LettersSheets: "Letters template for Google Sheets",
+      introLettersSheets: "A spreadsheet for ready-made letters: subject, body, Cc/Bcc and personalization — also imports into the app in one click.",
+      lettersSheetsBtn: "Download template (.xlsx)",
+      lettersSheetsHint: "Download the file, fill in the \"Letters\" sheet, then in the app's Letters tab click \"Import from Google Sheets\".",
+      h2SyncSetup: "Sync setup",
+      introSyncSetup: "Connecting your own Google Sheet (Client ID, Spreadsheet ID, ranges, write access) — a separate step-by-step guide, a bit longer than fits on this page.",
+      syncSetupBtn: "Open the setup guide",
+      syncSetupHint: "Available in English and French (README.en.md / README.fr.md in the repository).",
+      syncSetupHref: "https://github.com/skymaverick171/letter-dispatcher-sync/blob/main/README.en.md",
+      footer: "Letter Dispatcher Sync · installing on Windows / Android / iOS"
+    },
+    fr: {
+      h1: "Installation sur téléphone et ordinateur",
+      lede: "Letter Dispatcher est une page web ordinaire, mais elle peut être « installée » comme une vraie application : une icône sur le bureau ou l'écran d'accueil, sa propre fenêtre sans barre d'adresse. Voici comment faire, système par système.",
+      cta: "Ouvrir Letter Dispatcher Sync",
+      whyEyebrow: "Pourquoi l'installer",
+      whyText: "Rien ne change dans l'application elle-même — c'est simplement un accès en un geste, sa propre fenêtre et son icône, comme un programme classique. Les données restent exactement les mêmes que dans le navigateur — c'est la même page.",
+      h2Windows: "Windows",
+      introWindows: "Dans Chrome ou Edge — la fonction native du navigateur « Installer en tant qu'application ».",
+      stepsWindows: [
+        "Ouvrez le lien vers Letter Dispatcher.",
+        "Dans l'application (en haut), cliquez sur le bouton <strong>« Install app »</strong> — il apparaît de lui-même quand le navigateur juge la page installable.",
+        "Pas de bouton ? L'icône ⊕ / écran avec flèche à droite de la barre d'adresse, ou le menu du navigateur (⋮) → <strong>« Installer Letter Dispatcher… »</strong>.",
+        "Confirmez — une icône apparaît sur le bureau et dans le menu Démarrer."
+      ],
+      introAndroid: "Via Chrome — presque comme sur ordinateur.",
+      androidBadge: "Chrome pour Android",
+      stepsAndroid: [
+        "Ouvrez le lien vers Letter Dispatcher dans Chrome.",
+        "Appuyez sur <strong>« Install app »</strong> en haut de l'application — ou ouvrez le menu Chrome (⋮) et choisissez <strong>« Installer l'application »</strong> / <strong>« Ajouter à l'écran d'accueil »</strong>.",
+        "Confirmez dans la fenêtre qui apparaît.",
+        "L'icône apparaît sur l'écran d'accueil et dans la liste des applications — elle s'ouvre dans sa propre fenêtre, sans barre d'adresse."
+      ],
+      h2Ios: "iPhone / iPad",
+      introIos: "Safari n'a pas de bouton automatique pour cela — une limitation d'iOS lui-même — mais l'ajout manuel prend quelques secondes.",
+      stepsIos: [
+        "Ouvrez le lien <strong>dans Safari uniquement</strong> (cette action ne fonctionne pas dans Chrome ou un autre navigateur sur iOS).",
+        "Appuyez sur l'icône <strong>Partager</strong> (carré avec une flèche vers le haut) en bas de l'écran.",
+        "Dans la liste, choisissez <strong>« Sur l'écran d'accueil »</strong> — il faut parfois faire défiler la liste.",
+        "Appuyez sur <strong>« Ajouter »</strong> en haut à droite."
+      ],
+      hintIos: "L'application elle-même affiche aussi cette astuce, au cas où vous l'oublieriez.",
+      h2Sheets: "Modèle Google Sheets",
+      introSheets: "Un tableau prêt à l'emploi pour importer rapidement vos contacts — avec les bonnes colonnes et un exemple.",
+      sheetsBtn: "Télécharger le modèle (.xlsx)",
+      sheetsHint: "Téléchargez le fichier, puis ouvrez-le dans Google Sheets : « Fichier » → « Importer » → « Charger » — ou ouvrez-le simplement dans Excel.",
+      h2LettersSheets: "Modèle de lettres pour Google Sheets",
+      introLettersSheets: "Un tableau pour vos lettres prêtes à l'emploi : objet, texte, Cc/Bcc et personnalisation — s'importe aussi dans l'application en un clic.",
+      lettersSheetsBtn: "Télécharger le modèle (.xlsx)",
+      lettersSheetsHint: "Téléchargez le fichier, remplissez la feuille « Letters », puis dans l'onglet Letters de l'application cliquez sur « Import from Google Sheets ».",
+      h2SyncSetup: "Configuration de la synchronisation",
+      introSyncSetup: "Connecter votre propre feuille Google (Client ID, ID de la feuille, plages, accès en écriture) — un guide pas à pas séparé, un peu trop long pour cette page.",
+      syncSetupBtn: "Ouvrir le guide de configuration",
+      syncSetupHint: "Disponible en anglais et en français (README.en.md / README.fr.md dans le dépôt).",
+      syncSetupHref: "https://github.com/skymaverick171/letter-dispatcher-sync/blob/main/README.fr.md",
+      footer: "Letter Dispatcher Sync · installation sur Windows / Android / iOS"
+    }
+  };
+
+  function detectLang() {
+    var nav = (navigator.language || "en").toLowerCase();
+    if (nav.indexOf("ru") === 0) return "ru";
+    if (nav.indexOf("fr") === 0) return "fr";
+    return "en";
+  }
+
+  function stepsHtml(list) {
+    return list.map(function (s) { return "<li>" + s + "</li>"; }).join("");
+  }
+
+  function render(lang) {
+    var t = I18N[lang];
+    document.getElementById("tH1").textContent = t.h1;
+    document.getElementById("tLede").textContent = t.lede;
+    document.getElementById("tCta").textContent = t.cta;
+    document.getElementById("tWhyEyebrow").textContent = t.whyEyebrow;
+    document.getElementById("tWhyText").textContent = t.whyText;
+    document.getElementById("tH2Windows").textContent = t.h2Windows;
+    document.getElementById("tIntroWindows").textContent = t.introWindows;
+    document.getElementById("stepsWindows").innerHTML = stepsHtml(t.stepsWindows);
+    document.getElementById("tIntroAndroid").textContent = t.introAndroid;
+    document.getElementById("tAndroidBadge").textContent = t.androidBadge;
+    document.getElementById("stepsAndroid").innerHTML = stepsHtml(t.stepsAndroid);
+    document.getElementById("tH2Ios").textContent = t.h2Ios;
+    document.getElementById("tIntroIos").textContent = t.introIos;
+    document.getElementById("stepsIos").innerHTML = stepsHtml(t.stepsIos);
+    document.getElementById("tHintIos").textContent = t.hintIos;
+    document.getElementById("tH2Sheets").textContent = t.h2Sheets;
+    document.getElementById("tIntroSheets").textContent = t.introSheets;
+    document.getElementById("tSheetsBtn").textContent = t.sheetsBtn;
+    document.getElementById("tSheetsHint").textContent = t.sheetsHint;
+    document.getElementById("tH2LettersSheets").textContent = t.h2LettersSheets;
+    document.getElementById("tIntroLettersSheets").textContent = t.introLettersSheets;
+    document.getElementById("tLettersSheetsBtn").textContent = t.lettersSheetsBtn;
+    document.getElementById("tLettersSheetsHint").textContent = t.lettersSheetsHint;
+    document.getElementById("tH2SyncSetup").textContent = t.h2SyncSetup;
+    document.getElementById("tIntroSyncSetup").textContent = t.introSyncSetup;
+    document.getElementById("tSyncSetupBtn").textContent = t.syncSetupBtn;
+    document.getElementById("tSyncSetupHint").textContent = t.syncSetupHint;
+    document.getElementById("syncSetupLink").href = t.syncSetupHref;
+    document.getElementById("tFooter").textContent = t.footer;
+    document.documentElement.setAttribute("lang", lang);
+    var buttons = document.querySelectorAll("#langSwitch button");
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].classList.toggle("active", buttons[i].dataset.lang === lang);
+    }
+  }
+
+  var buttons = document.querySelectorAll("#langSwitch button");
+  for (var i = 0; i < buttons.length; i++) {
+    buttons[i].addEventListener("click", function () { render(this.dataset.lang); });
+  }
+
+  render(detectLang());
+})();
+</script>
+</body>
+</html>
