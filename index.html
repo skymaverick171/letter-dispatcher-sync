@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Letter Dispatcher Sync</title>
@@ -243,7 +244,7 @@
     letter-spacing: 0.04em;
     margin-bottom: 5px;
   }
-  input[type="text"], input[type="email"], input[type="search"], textarea, select {
+  input[type="text"], input[type="email"], input[type="search"], input[type="tel"], textarea, select {
     width: 100%;
     font: inherit;
     color: var(--ink);
@@ -776,6 +777,16 @@
     border-radius: 8px;
     padding: 4px 12px;
   }
+  /* Address book list: same capped-height scroll box as the Recipients
+     checklists above, sized by capChecklistToVisibleRows() at render time. */
+  #contactList.list-scroll-box {
+    max-height: none;
+    overflow-y: auto;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px 12px;
+  }
   .contact-check { flex-wrap: wrap; }
   .contact-check label { display: flex; flex-direction: column; gap: 2px; }
   .contact-check .name-line { display: flex; align-items: center; }
@@ -846,6 +857,7 @@
 </style>
 </head>
 <body>
+
 
 <div class="stripe"></div>
 <div class="shell">
@@ -1064,6 +1076,10 @@
             <datalist id="groupOptions"></datalist>
           </div>
         </div>
+        <div style="margin-top:12px;">
+          <label class="field" data-i18n="fieldPhone">Phone</label>
+          <input type="tel" id="newContactPhone" placeholder="+1 555 123 4567" data-i18n-ph="phonePlaceholder">
+        </div>
         <div class="row" style="margin-top:12px;">
           <button class="btn primary" id="addContactBtn" data-i18n="addContactBtn">Add contact</button>
           <button class="btn ghost" id="cancelContactEdit" hidden data-i18n="cancelEditBtn">Cancel editing</button>
@@ -1091,7 +1107,7 @@
         </div>
       </div>
       <div class="panel-body">
-        <ul class="list" id="contactList"></ul>
+        <ul class="list list-scroll-box" id="contactList"></ul>
       </div>
     </div>
 
@@ -1293,7 +1309,7 @@
     <div class="panel">
       <div class="panel-head"><h2 data-i18n="syncTitle">Google Sheets sync</h2></div>
       <div class="panel-body">
-        <p class="hint" data-i18n="syncIntroHint">One-way for now: pulls Contacts and Letters from a Google Sheet into this app. Changes made here are not sent back to the sheet.</p>
+        <p class="hint" data-i18n="syncIntroHint">Pulls Contacts and Letters from a Google Sheet into this app. Admins (see below) also push local changes back to the sheet; everyone else gets one-way (sheet → app) sync.</p>
         <p class="hint" data-i18n="syncOnlineOnlyHint">Sign-in and syncing only work on the real deployed site (not in this preview) — Google blocks its sign-in script from running inside a sandboxed page.</p>
         <div class="grid-form" style="margin-top:10px;">
           <div>
@@ -1310,11 +1326,20 @@
         <div class="grid-form">
           <div>
             <label class="field" data-i18n="fieldSyncContactsRange">Contacts sheet/range</label>
-            <input type="text" id="syncContactsRange" autocomplete="off" spellcheck="false" placeholder="Contacts!A:D">
+            <input type="text" id="syncContactsRange" autocomplete="off" spellcheck="false" placeholder="Contacts!A:F">
+            <p class="hint" data-i18n="syncIdColumnHint">Column F is a hidden ID column the app manages itself — leave it in the range, but don't edit it by hand.</p>
           </div>
           <div>
             <label class="field" data-i18n="fieldSyncLettersRange">Letters sheet/range</label>
-            <input type="text" id="syncLettersRange" autocomplete="off" spellcheck="false" placeholder="Letters!A:E">
+            <input type="text" id="syncLettersRange" autocomplete="off" spellcheck="false" placeholder="Letters!A:F">
+            <p class="hint" data-i18n="syncIdColumnHint">Column F is a hidden ID column the app manages itself — leave it in the range, but don't edit it by hand.</p>
+          </div>
+        </div>
+        <div class="grid-form">
+          <div>
+            <label class="field" data-i18n="fieldSyncAdminsRange">Admins sheet/range (optional)</label>
+            <input type="text" id="syncAdminsRange" autocomplete="off" spellcheck="false" placeholder="Admins!A:A">
+            <p class="hint" data-i18n="syncAdminsRangeHint">A sheet listing which Google accounts (one email per row) may push changes back to the sheet. Anyone signed in with an email not on this list gets one-way (read-only) sync. Leave blank to keep everyone one-way.</p>
           </div>
         </div>
         <div class="row" style="margin-top:10px;">
@@ -1325,6 +1350,9 @@
           <button type="button" class="btn primary" id="syncSignInBtn" data-i18n="syncSignInBtn">Sign in with Google</button>
           <button type="button" class="btn ghost" id="syncSignOutBtn" hidden data-i18n="syncSignOutBtn">Sign out</button>
           <span id="syncAuthStatus" class="hint" style="margin:0;" data-i18n="syncNotSignedInMsg">Not signed in.</span>
+        </div>
+        <div class="row" style="margin-top:6px; align-items:center; gap:12px; flex-wrap:wrap;">
+          <span id="syncRoleStatus" class="hint" style="margin:0;"></span>
         </div>
         <div class="row" style="margin-top:10px; align-items:center; gap:12px; flex-wrap:wrap;">
           <button type="button" class="btn primary" id="syncNowBtn" disabled data-i18n="syncNowBtn">Sync now</button>
@@ -1355,6 +1383,18 @@
     <div class="confirm-actions">
       <button type="button" class="btn primary" id="confirmSaveBtn"></button>
       <button type="button" class="btn ghost" id="confirmDiscardBtn"></button>
+    </div>
+  </div>
+</div>
+
+<div class="install-help-overlay" id="syncConflictOverlay" hidden>
+  <div class="install-help-card" role="dialog" aria-modal="true" aria-labelledby="syncConflictTitleEl">
+    <h3 id="syncConflictTitleEl"></h3>
+    <p id="syncConflictText" style="white-space:pre-line;"></p>
+    <div class="confirm-actions" style="flex-direction:column; align-items:stretch; gap:8px;">
+      <button type="button" class="btn primary" id="syncConflictLocalBtn"></button>
+      <button type="button" class="btn" id="syncConflictSheetBtn"></button>
+      <button type="button" class="btn ghost" id="syncConflictSkipBtn"></button>
     </div>
   </div>
 </div>
@@ -1390,13 +1430,17 @@
     dbg: null,
     mailApp: "gmail",
     lang: "en",
-    // Google Sheets sync (SYNC edition, one-way for now). The access token
-    // is deliberately session/memory-only: it is never written to
-    // localStorage, only the non-secret config below is persisted.
+    // Google Sheets sync (SYNC edition, two-way for admins / one-way for
+    // everyone else — see the "Google Sheets sync" section near the bottom
+    // of this file). The access token is deliberately session/memory-only:
+    // it is never written to localStorage, only the non-secret config below
+    // is persisted.
     syncAccessToken: null,
     syncTokenExpiresAt: 0,
-    syncConfig: { clientId: "", spreadsheetId: "", contactsRange: "", lettersRange: "" },
+    syncConfig: { clientId: "", spreadsheetId: "", contactsRange: "", lettersRange: "", adminsRange: "" },
     syncRunning: false,
+    syncUserEmail: "",
+    syncIsAdmin: false,
   };
 
   // Fixed palette of soft/pastel colors an address-book group can be
@@ -1509,6 +1553,9 @@
       officePlaceholder: "123 Main St, Springfield",
       fieldGroup: "Group",
       groupPlaceholder: "e.g. Sales",
+      fieldPhone: "Phone",
+      phonePlaceholder: "+1 555 123 4567",
+      callBtnLabel: "Call",
       allGroupsOption: "All groups",
       allOfficesOption: "All offices",
       filterBtn: "Filter",
@@ -1544,7 +1591,7 @@
       downloadCsvBtn: "Download CSV",
       emptyContactsMsg: "No contacts yet — add your first one above.",
       importTitle: "Import from Google Sheets",
-      importHint: "Select the \"Name\" and \"Email\" columns in your Google Sheet (add \"Office\" and \"Group\" columns too, if you like), copy (Ctrl/Cmd+C) and paste here — or upload a CSV file exported from the sheet (File → Download → CSV).",
+      importHint: "Select the \"Name\" and \"Email\" columns in your Google Sheet (add \"Office\", \"Group\" and \"Phone\" columns too, if you like), copy (Ctrl/Cmd+C) and paste here — or upload a CSV file exported from the sheet (File → Download → CSV).",
       importPastePlaceholder: "Jane Doe\tjane@example.com\nJohn Smith\tjohn@example.com",
       importPasteBtn: "Import pasted rows",
       chooseCsvBtn: "Choose CSV file…",
@@ -1608,17 +1655,22 @@
       sheetsPulledUpdatedMsg: "Updated from sheet: {n}.",
       sheetsErrorMsg: "Error: {n}",
       syncTitle: "Google Sheets sync",
-      syncIntroHint: "One-way for now: pulls Contacts and Letters from a Google Sheet into this app. Changes made here are not sent back to the sheet.",
+      syncIntroHint: "Pulls Contacts and Letters from a Google Sheet into this app. Admins (see below) also push local changes back to the sheet; everyone else gets one-way (sheet → app) sync.",
       syncOnlineOnlyHint: "Sign-in and syncing only work on the real deployed site (not in this preview) — Google blocks its sign-in script from running inside a sandboxed page.",
       fieldSyncClientId: "Google Client ID",
       syncClientIdHint: "From your own Google Cloud project's OAuth credentials (OAuth client ID, type \"Web application\"). Not a secret, but ties sync to your project.",
       fieldSyncContactsRange: "Contacts sheet/range",
       fieldSyncLettersRange: "Letters sheet/range",
+      syncIdColumnHint: "This column is a hidden ID the app manages itself — leave it in the range, but don't edit it by hand.",
+      fieldSyncAdminsRange: "Admins sheet/range (optional)",
+      syncAdminsRangeHint: "A sheet listing which Google accounts (one email per row) may push changes back to the sheet. Anyone signed in with an email not on this list gets one-way (read-only) sync. Leave blank to keep everyone one-way.",
       syncSignInBtn: "Sign in with Google",
       syncSignOutBtn: "Sign out",
       syncNotSignedInMsg: "Not signed in.",
       syncSignedInMsg: "Signed in — sync stays available for about an hour, then you'll need to sign in again.",
       syncSigningInMsg: "Waiting for Google sign-in…",
+      syncRoleAdmin: "Signed in as {name} — two-way sync (push + pull).",
+      syncRoleReadOnly: "Signed in as {name} — one-way sync (read-only; not on the admins list).",
       syncNowBtn: "Sync now",
       syncConfirmText: "Import {n} item(s) (contacts and letters) found in the Google Sheet?",
       syncConfigNeededWarn: "Fill in the Client ID and Spreadsheet ID first, then save settings.",
@@ -1628,6 +1680,17 @@
       syncDoneMsg: "Synced {n} contact(s) and letter(s).",
       syncPartialErrorMsg: "Contacts synced, but the Letters sheet failed: {n}",
       syncLastRunPrefix: "Last synced: ",
+      syncTwoWayDoneMsg: "Sync complete — pulled {n}.",
+      syncConflictTitle: "Changed on both sides",
+      syncConflictContactText: "Contact \"{name}\" changed both here and in the sheet since the last sync.\n\nHere: {local}\n\nSheet: {sheet}",
+      syncConflictLetterText: "Letter \"{name}\" changed both here and in the sheet since the last sync.\n\nHere: {local}\n\nSheet: {sheet}",
+      syncConflictKeepLocalBtn: "Keep this app's version",
+      syncConflictKeepSheetBtn: "Keep the sheet's version",
+      syncConflictSkipBtn: "Skip for now",
+      syncNeedsIdColumnWarn: "Two-way sync needs a hidden ID column — add one more column to the end of the range (F for both Contacts and Letters).",
+      syncTwoWaySummaryText: "{n} change(s) found (new/updated contacts and letters, in both directions). Apply them?",
+      syncTwoWayConflictsSuffix: "Plus {n} conflict(s) you'll be asked about one by one.",
+      syncNothingToDoMsg: "Already up to date — nothing to push or pull.",
     },
     fr: {
       appTitle: "Expéditeur de lettres",
@@ -1704,6 +1767,9 @@
       officePlaceholder: "10 rue de la Paix, Paris",
       fieldGroup: "Groupe",
       groupPlaceholder: "ex. Ventes",
+      fieldPhone: "Téléphone",
+      phonePlaceholder: "+33 1 23 45 67 89",
+      callBtnLabel: "Appeler",
       allGroupsOption: "Tous les groupes",
       allOfficesOption: "Tous les bureaux",
       filterBtn: "Filtrer",
@@ -1739,7 +1805,7 @@
       downloadCsvBtn: "Télécharger le CSV",
       emptyContactsMsg: "Pas encore de contacts — ajoutez-en un ci-dessus.",
       importTitle: "Importer depuis Google Sheets",
-      importHint: "Sélectionnez les colonnes « Nom » et « Email » dans votre Google Sheet (ajoutez aussi « Office » et « Group » si vous le souhaitez), copiez (Ctrl/Cmd+C) et collez ici — ou importez un fichier CSV exporté de la feuille (Fichier → Télécharger → CSV).",
+      importHint: "Sélectionnez les colonnes « Nom » et « Email » dans votre Google Sheet (ajoutez aussi « Office », « Group » et « Phone » si vous le souhaitez), copiez (Ctrl/Cmd+C) et collez ici — ou importez un fichier CSV exporté de la feuille (Fichier → Télécharger → CSV).",
       importPastePlaceholder: "Claire Dubois\tclaire@example.com\nMarc Lefèvre\tmarc@example.com",
       importPasteBtn: "Importer les lignes collées",
       chooseCsvBtn: "Choisir un fichier CSV…",
@@ -1803,17 +1869,22 @@
       sheetsPulledUpdatedMsg: "Mis à jour depuis la feuille : {n}.",
       sheetsErrorMsg: "Erreur : {n}",
       syncTitle: "Synchronisation Google Sheets",
-      syncIntroHint: "Pour l'instant à sens unique : récupère les Contacts et les Lettres d'une feuille Google vers cette appli. Les modifications faites ici ne sont pas renvoyées vers la feuille.",
+      syncIntroHint: "Récupère les Contacts et les Lettres d'une feuille Google vers cette appli. Les administrateurs (voir ci-dessous) renvoient aussi les modifications locales vers la feuille ; pour tous les autres, la synchro reste à sens unique (feuille → appli).",
       syncOnlineOnlyHint: "La connexion et la synchronisation ne fonctionnent que sur le site réellement déployé (pas dans cet aperçu) — Google bloque son script de connexion dans une page en bac à sable.",
       fieldSyncClientId: "ID client Google",
       syncClientIdHint: "Provient des identifiants OAuth de votre propre projet Google Cloud (ID client OAuth, type « Application Web »). Pas un secret, mais lie la synchro à votre projet.",
       fieldSyncContactsRange: "Feuille/plage des Contacts",
       fieldSyncLettersRange: "Feuille/plage des Lettres",
+      syncIdColumnHint: "Cette colonne est un identifiant caché géré par l'application elle-même — gardez-la dans la plage, mais ne la modifiez pas à la main.",
+      fieldSyncAdminsRange: "Feuille/plage des administrateurs (optionnel)",
+      syncAdminsRangeHint: "Une feuille listant les comptes Google (un email par ligne) autorisés à renvoyer des modifications vers la feuille. Toute personne connectée avec un email absent de cette liste reste en synchro à sens unique (lecture seule). Laissez vide pour que tout le monde reste à sens unique.",
       syncSignInBtn: "Se connecter avec Google",
       syncSignOutBtn: "Se déconnecter",
       syncNotSignedInMsg: "Non connecté.",
       syncSignedInMsg: "Connecté — la synchro reste disponible environ une heure, puis il faudra vous reconnecter.",
       syncSigningInMsg: "En attente de la connexion Google…",
+      syncRoleAdmin: "Connecté en tant que {name} — synchro bidirectionnelle (envoi + réception).",
+      syncRoleReadOnly: "Connecté en tant que {name} — synchro à sens unique (lecture seule ; absent de la liste des administrateurs).",
       syncNowBtn: "Synchroniser maintenant",
       syncConfirmText: "Importer {n} élément(s) (contacts et lettres) trouvé(s) dans la feuille Google ?",
       syncConfigNeededWarn: "Renseignez d'abord l'ID client et l'ID de la feuille, puis enregistrez.",
@@ -1823,12 +1894,23 @@
       syncDoneMsg: "{n} contact(s) et lettre(s) synchronisés.",
       syncPartialErrorMsg: "Contacts synchronisés, mais la feuille des Lettres a échoué : {n}",
       syncLastRunPrefix: "Dernière synchro : ",
+      syncTwoWayDoneMsg: "Synchro terminée — {n} élément(s) reçu(s).",
+      syncConflictTitle: "Modifié des deux côtés",
+      syncConflictContactText: "Le contact « {name} » a changé ici et dans la feuille depuis la dernière synchro.\n\nIci : {local}\n\nFeuille : {sheet}",
+      syncConflictLetterText: "La lettre « {name} » a changé ici et dans la feuille depuis la dernière synchro.\n\nIci : {local}\n\nFeuille : {sheet}",
+      syncConflictKeepLocalBtn: "Garder la version de l'appli",
+      syncConflictKeepSheetBtn: "Garder la version de la feuille",
+      syncConflictSkipBtn: "Ignorer pour l'instant",
+      syncNeedsIdColumnWarn: "La synchro bidirectionnelle a besoin d'une colonne ID cachée — ajoutez une colonne à la fin de la plage (F pour les Contacts comme pour les Lettres).",
+      syncTwoWaySummaryText: "{n} changement(s) trouvé(s) (contacts et lettres nouveaux/modifiés, dans les deux sens). Les appliquer ?",
+      syncTwoWayConflictsSuffix: "Plus {n} conflit(s) qui vous seront soumis un par un.",
+      syncNothingToDoMsg: "Déjà à jour — rien à envoyer ou à recevoir.",
     }
   };
 
   var LOCAL_CONTACTS = [
-    { id: "local-c1", name: "Jane Doe (example)", email: "jane.doe@example.com", office: "500 Market St, San Francisco", group: "Sales" },
-    { id: "local-c2", name: "John Smith (example)", email: "john.smith@example.com", office: "12 rue de Rivoli, Paris", group: "Support" }
+    { id: "local-c1", name: "Jane Doe (example)", email: "jane.doe@example.com", office: "500 Market St, San Francisco", group: "Sales", phone: "+1 415 555 0101" },
+    { id: "local-c2", name: "John Smith (example)", email: "john.smith@example.com", office: "12 rue de Rivoli, Paris", group: "Support", phone: "+33 1 42 60 12 34" }
   ];
   var LOCAL_LETTERS = [
     {
@@ -1896,6 +1978,13 @@
       btn.classList.add("active");
       $all(".view").forEach(function (v) { v.classList.remove("active"); });
       $("#view-" + btn.dataset.tab).classList.add("active");
+      // #contactList can be rendered while the Contacts tab is hidden
+      // (display:none), where every row measures 0 height — re-measure the
+      // scroll cap now that it's actually visible, same as the Recipients
+      // panels do when they open.
+      if (btn.dataset.tab === "contacts") {
+        capChecklistToVisibleRows($("#contactList"), 5, "li");
+      }
     });
   });
 
@@ -2003,6 +2092,7 @@
   }
   function deleteContact(id) {
     if (id === state.editingContactId) resetContactForm();
+    markSyncTombstone("contacts", id);
     if (state.dbc) return state.dbc.doc(id).delete();
     state.contacts = state.contacts.filter(function (c) { return c.id !== id; });
     lsSave(LS_KEYS.contacts, state.contacts);
@@ -2027,6 +2117,7 @@
     return Promise.resolve();
   }
   function deleteLetter(id) {
+    markSyncTombstone("letters", id);
     if (state.dbl) return state.dbl.doc(id).delete();
     state.letters = state.letters.filter(function (l) { return l.id !== id; });
     lsSave(LS_KEYS.letters, state.letters);
@@ -2381,13 +2472,16 @@
             '<div class="title">' + esc(c.name) + groupTagHtml(c.group) + '</div>' +
             '<div class="sub">' + esc(c.email) + '</div>' +
             (c.office ? '<div class="sub">' + esc(c.office) + '</div>' : '') +
+            (c.phone ? '<div class="sub">' + esc(c.phone) + '</div>' : '') +
           '</div>' +
           '<div class="item-actions">' +
+          (c.phone ? '<button class="btn ghost" data-call-contact="' + esc(c.phone.replace(/[^\d+]/g, "")) + '" title="' + esc(t("callBtnLabel")) + '">📞</button>' : '') +
           '<button class="btn ghost" data-edit-contact="' + esc(c.id) + '">✎</button>' +
           '<button class="btn ghost" data-del-contact="' + esc(c.id) + '">✕</button>' +
           '</div></li>';
       }).join("");
     }
+    capChecklistToVisibleRows($("#contactList"), 5, "li");
     $all("[data-del-contact]").forEach(function (b) {
       b.addEventListener("click", function () {
         var id = b.dataset.delContact;
@@ -2410,6 +2504,15 @@
         if (c) loadContactIntoEditor(c);
       });
     });
+    // tel: links open the device's default phone/calling app when one is
+    // registered to handle them (the native dialer on a phone; whatever app
+    // — Skype, FaceTime, etc. — claims tel: links on desktop); if nothing
+    // claims tel:, the browser itself reports that rather than this page.
+    $all("[data-call-contact]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        window.location.href = "tel:" + b.dataset.callContact;
+      });
+    });
     renderGroupColorsPopover();
     renderLetterRecipientChecklist();
     renderSendRecipientsPanel();
@@ -2421,6 +2524,7 @@
     $("#newContactEmail").value = c.email || "";
     $("#newContactOffice").value = c.office || "";
     $("#newContactGroup").value = c.group || "";
+    $("#newContactPhone").value = c.phone || "";
     $("#contactFormTitle").textContent = t("editContactTitle");
     $("#cancelContactEdit").hidden = false;
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -2433,6 +2537,7 @@
     $("#newContactEmail").value = "";
     $("#newContactOffice").value = "";
     $("#newContactGroup").value = "";
+    $("#newContactPhone").value = "";
     $("#contactFormTitle").textContent = t("newContactTitle");
     $("#cancelContactEdit").hidden = true;
     state.contactFormBaseline = currentContactFormValues();
@@ -2446,14 +2551,15 @@
       name: $("#newContactName").value,
       email: $("#newContactEmail").value,
       office: $("#newContactOffice").value,
-      group: $("#newContactGroup").value
+      group: $("#newContactGroup").value,
+      phone: $("#newContactPhone").value
     };
   }
   function contactFormHasUnsavedChanges() {
     var cur = currentContactFormValues();
-    var base = state.contactFormBaseline || { name: "", email: "", office: "", group: "" };
+    var base = state.contactFormBaseline || { name: "", email: "", office: "", group: "", phone: "" };
     return cur.name !== base.name || cur.email !== base.email ||
-      cur.office !== base.office || cur.group !== base.group;
+      cur.office !== base.office || cur.group !== base.group || cur.phone !== base.phone;
   }
 
   // Generic recipient checklist renderer shared by the Letters-tab editor
@@ -2790,8 +2896,8 @@
   // real (possibly multi-line) height, scrolling for the rest — instead of
   // a fixed pixel guess that would show too many or too few rows depending
   // on how much each row's text wraps.
-  function capChecklistToVisibleRows(box, visibleCount) {
-    var rows = box.querySelectorAll(".contact-check");
+  function capChecklistToVisibleRows(box, visibleCount, rowSelector) {
+    var rows = box.querySelectorAll(rowSelector || ".contact-check");
     if (rows.length <= visibleCount) {
       box.style.maxHeight = "";
       return;
@@ -3060,8 +3166,8 @@
     return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
   }
   function contactsToDelimited(sep) {
-    var rows = [[t("fieldName"), "Email", t("fieldOffice"), t("fieldGroup")]].concat(
-      state.contacts.map(function (c) { return [c.name, c.email, c.office || "", c.group || ""]; })
+    var rows = [[t("fieldName"), "Email", t("fieldOffice"), t("fieldGroup"), t("fieldPhone")]].concat(
+      state.contacts.map(function (c) { return [c.name, c.email, c.office || "", c.group || "", c.phone || ""]; })
     );
     if (sep === "\t") return rows.map(function (r) { return r.join("\t"); }).join("\n");
     return rows.map(function (r) { return r.map(csvEscape).join(","); }).join("\r\n");
@@ -3203,8 +3309,9 @@
       var email = (r[1] || "").trim();
       var office = (r[2] || "").trim();
       var group = (r[3] || "").trim();
+      var phone = (r[4] || "").trim();
       if (name && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        out.push({ name: name, email: email, office: office, group: group });
+        out.push({ name: name, email: email, office: office, group: group, phone: phone });
       }
     });
     return out;
@@ -3336,12 +3443,13 @@
     var email = $("#newContactEmail").value.trim();
     var office = $("#newContactOffice").value.trim();
     var group = $("#newContactGroup").value.trim();
+    var phone = $("#newContactPhone").value.trim();
     var msg = $("#contactFormMsg");
     if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       msg.innerHTML = '<div class="status-msg warn">' + esc(t("nameEmailWarn")) + '</div>';
       return;
     }
-    saveContact(state.editingContactId, { name: name, email: email, office: office, group: group });
+    saveContact(state.editingContactId, { name: name, email: email, office: office, group: group, phone: phone });
     resetContactForm();
     msg.innerHTML = '';
   });
@@ -4243,18 +4351,47 @@
   })();
 
   // ---------- Google Sheets sync (SYNC edition) ----------
-  // One-way only for now: Sheets -> app. Uses Google Identity Services'
-  // client-side token flow (no backend needed, since this is a static
-  // GitHub Pages site). The access token lives in memory only
-  // (state.syncAccessToken) and is never persisted; only the client id /
-  // spreadsheet id / ranges are saved to localStorage, mirroring the
-  // LS_KEYS/lsLoad pattern above but as a single JSON object.
+  // Two-way for admins, one-way (read-only, the original Stage 1 behavior)
+  // for everyone else. Uses Google Identity Services' client-side token
+  // flow (no backend needed, since this is a static GitHub Pages site).
+  // The access token lives in memory only (state.syncAccessToken) and is
+  // never persisted; only the client id / spreadsheet id / ranges / admins
+  // range are saved to localStorage, mirroring the LS_KEYS/lsLoad pattern
+  // above but as a single JSON object.
+  //
+  // "Admin" is decided by e-mail: the admins range is a sheet (default tab
+  // name "Admins", column A) listing which signed-in Google accounts are
+  // allowed to push local changes back to the spreadsheet. It lives in the
+  // spreadsheet itself (not localStorage) specifically so the same list
+  // applies on every device without re-entering anything per-device — the
+  // same per-device localStorage gap that made Stage 1's config need
+  // re-entry on the phone. Enforcement is client-side only (this is a
+  // static site with no server), so it is a UI safeguard, not a security
+  // boundary — real access control still comes from who Google lets edit
+  // the sheet at all.
+  //
+  // Two more localStorage-backed structures make two-way sync possible
+  // without server-side bookkeeping, since the Sheets API exposes no
+  // per-row edit timestamps:
+  //  - syncSnapshot: the last-known-synced field values per record id, used
+  //    to tell which side (app or sheet) changed a record since the last
+  //    sync.
+  //  - syncTombstones: ids of records deleted locally after having been
+  //    synced at least once, so the very next sync doesn't "resurrect" them
+  //    from the sheet — deletions are intentionally never propagated
+  //    either direction (an app-side deletion doesn't delete the sheet row;
+  //    a sheet-row deletion doesn't delete the local record).
   var SYNC_LS_KEY = "letterDispatcher.syncConfig";
-  var SYNC_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
+  var SYNC_SNAPSHOT_LS_KEY = "letterDispatcher.syncSnapshot";
+  var SYNC_TOMBSTONES_LS_KEY = "letterDispatcher.syncTombstones";
+  var SYNC_SCOPE = "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email";
+  var SYNC_CONTACT_FIELDS = ["name", "email", "office", "group", "phone"];
+  var SYNC_LETTER_FIELDS = ["subject", "body", "cc", "bcc", "personalize"];
+
   function loadSyncConfig() {
     var raw = null;
     try { raw = localStorage.getItem(SYNC_LS_KEY); } catch (e) {}
-    var empty = { clientId: "", spreadsheetId: "", contactsRange: "", lettersRange: "" };
+    var empty = { clientId: "", spreadsheetId: "", contactsRange: "", lettersRange: "", adminsRange: "" };
     if (!raw) return empty;
     try {
       var parsed = JSON.parse(raw);
@@ -4263,6 +4400,7 @@
         spreadsheetId: parsed.spreadsheetId || "",
         contactsRange: parsed.contactsRange || "",
         lettersRange: parsed.lettersRange || "",
+        adminsRange: parsed.adminsRange || "",
       };
     } catch (e) {
       return empty;
@@ -4272,15 +4410,343 @@
     try { localStorage.setItem(SYNC_LS_KEY, JSON.stringify(cfg)); } catch (e) {}
   }
 
+  function loadSyncSnapshot() {
+    var raw = null;
+    try { raw = localStorage.getItem(SYNC_SNAPSHOT_LS_KEY); } catch (e) {}
+    if (!raw) return { contacts: {}, letters: {} };
+    try {
+      var parsed = JSON.parse(raw);
+      return { contacts: parsed.contacts || {}, letters: parsed.letters || {} };
+    } catch (e) {
+      return { contacts: {}, letters: {} };
+    }
+  }
+  function saveSyncSnapshot(snap) {
+    try { localStorage.setItem(SYNC_SNAPSHOT_LS_KEY, JSON.stringify(snap)); } catch (e) {}
+  }
+
+  function loadSyncTombstones() {
+    var raw = null;
+    try { raw = localStorage.getItem(SYNC_TOMBSTONES_LS_KEY); } catch (e) {}
+    var empty = { contacts: [], letters: [] };
+    if (!raw) return empty;
+    try {
+      var parsed = JSON.parse(raw);
+      return {
+        contacts: Array.isArray(parsed.contacts) ? parsed.contacts : [],
+        letters: Array.isArray(parsed.letters) ? parsed.letters : [],
+      };
+    } catch (e) {
+      return empty;
+    }
+  }
+  function saveSyncTombstonesToStorage(obj) {
+    try { localStorage.setItem(SYNC_TOMBSTONES_LS_KEY, JSON.stringify(obj)); } catch (e) {}
+  }
+  // Called from deleteContact/deleteLetter (see above). Only worth
+  // recording if this id was ever actually synced — a record that was
+  // never pushed/pulled has nothing to "resurrect" on the next sync.
+  function markSyncTombstone(kind, id) {
+    if (!id) return;
+    var snap = loadSyncSnapshot();
+    if (!snap[kind] || !snap[kind][id]) return;
+    var tomb = loadSyncTombstones();
+    if (tomb[kind].indexOf(id) === -1) {
+      tomb[kind].push(id);
+      saveSyncTombstonesToStorage(tomb);
+    }
+  }
+
+  // Row-position-aware parsing for the two-way engine: unlike
+  // parseImportRows/parseImportLetterRows (which discard position and
+  // apply a header-sniffing heuristic), row 1 is always treated as the
+  // header here, and each row keeps its real sheet row number (for
+  // targeted values.update calls) and its ID column value.
+  function parseSyncContactsRows(rows) {
+    var body = rows.length ? rows.slice(1) : [];
+    var out = [];
+    body.forEach(function (r, i) {
+      var name = (r[0] || "").trim();
+      var email = (r[1] || "").trim();
+      var office = (r[2] || "").trim();
+      var group = (r[3] || "").trim();
+      var phone = (r[4] || "").trim();
+      var id = (r[5] || "").trim();
+      out.push({
+        rowNumber: i + 2, id: id, name: name, email: email, office: office, group: group, phone: phone,
+        isBlank: !name && !email && !office && !group && !phone && !id,
+      });
+    });
+    return out;
+  }
+  function parseSyncLettersRows(rows) {
+    var body = rows.length ? rows.slice(1) : [];
+    var out = [];
+    body.forEach(function (r, i) {
+      var subject = (r[0] || "").trim();
+      var text = (r[1] || "").trim();
+      var cc = (r[2] || "").trim();
+      var bcc = (r[3] || "").trim();
+      var personalizeRaw = (r[4] || "").trim().toLowerCase();
+      var personalize = ["no", "non", "false", "0", "нет"].indexOf(personalizeRaw) === -1;
+      var id = (r[5] || "").trim();
+      out.push({
+        rowNumber: i + 2, id: id, subject: subject, body: text, cc: cc, bcc: bcc, personalize: personalize,
+        isBlank: !subject && !text && !cc && !bcc && !id,
+      });
+    });
+    return out;
+  }
+
+  function extractFields(fields, obj) {
+    var out = {};
+    fields.forEach(function (f) {
+      out[f] = obj[f] != null ? obj[f] : (f === "personalize" ? true : "");
+    });
+    return out;
+  }
+  function fieldsEqual(fields, a, b) {
+    return fields.every(function (f) { return (a[f] || "") === (b[f] || ""); });
+  }
+  function describeSyncFields(kind, f) {
+    if (kind === "contacts") {
+      var bits = [f.email, f.office, f.group, f.phone].filter(Boolean);
+      return (f.name || "—") + (bits.length ? " (" + bits.join(", ") + ")" : "");
+    }
+    var preview = (f.body || "").replace(/\s+/g, " ").slice(0, 60);
+    return (f.subject || "—") + ": " + preview + (preview.length === 60 ? "…" : "");
+  }
+
+  // Classifies every record into exactly one bucket by comparing the
+  // current local value, the current sheet value, and the last-synced
+  // snapshot value (see the syncSnapshot comment above) — this is what
+  // stands in for real per-row timestamps.
+  function buildSyncPlan(opts) {
+    var fields = opts.fields;
+    var localById = {};
+    opts.localRecords.forEach(function (r) { if (r.id) localById[r.id] = r; });
+    var sheetById = {};
+    var sheetNew = [];
+    opts.sheetRows.forEach(function (r) {
+      if (r.isBlank) return;
+      if (r.id) sheetById[r.id] = r; else sheetNew.push(r);
+    });
+    var tombSet = {};
+    (opts.tombstones || []).forEach(function (id) { tombSet[id] = true; });
+
+    var plan = { pushNew: [], pushUpdate: [], pullNew: [], pullUpdate: [], conflicts: [], retire: [] };
+
+    opts.localRecords.forEach(function (r) {
+      if (!r.id || opts.snapshot[r.id] || sheetById[r.id]) return;
+      plan.pushNew.push({ id: r.id, fields: extractFields(fields, r) });
+    });
+
+    var allIds = {};
+    Object.keys(opts.snapshot).forEach(function (id) { allIds[id] = true; });
+    Object.keys(sheetById).forEach(function (id) { allIds[id] = true; });
+
+    Object.keys(allIds).forEach(function (id) {
+      var snap = opts.snapshot[id];
+      var localRec = localById[id];
+      var sheetRec = sheetById[id];
+
+      if (!localRec) {
+        if (tombSet[id]) return; // deleted here on purpose -> never resurrect
+        if (!snap) {
+          if (sheetRec) plan.pullNew.push({ rowNumber: sheetRec.rowNumber, fields: extractFields(fields, sheetRec), existingId: id });
+          return;
+        }
+        if (sheetRec) plan.retire.push(id); // tracked, gone locally, still in sheet -> stop tracking quietly
+        return;
+      }
+      if (!sheetRec) {
+        if (snap) plan.retire.push(id); // row removed from the sheet by a human -> don't push it back
+        return;
+      }
+      if (!snap) {
+        // Both sides already have this id but there's no snapshot (fresh
+        // browser, or localStorage was cleared) — link up from the sheet's
+        // current value rather than treating a first-time link-up as a
+        // conflict.
+        plan.pullUpdate.push({ id: id, fields: extractFields(fields, sheetRec) });
+        return;
+      }
+
+      var snapFields = extractFields(fields, snap);
+      var localFieldsNow = extractFields(fields, localRec);
+      var sheetFieldsNow = extractFields(fields, sheetRec);
+      var localChanged = !fieldsEqual(fields, snapFields, localFieldsNow);
+      var sheetChanged = !fieldsEqual(fields, snapFields, sheetFieldsNow);
+      if (!localChanged && !sheetChanged) return;
+      if (localChanged && !sheetChanged) { plan.pushUpdate.push({ id: id, rowNumber: sheetRec.rowNumber, fields: localFieldsNow }); return; }
+      if (!localChanged && sheetChanged) { plan.pullUpdate.push({ id: id, fields: sheetFieldsNow }); return; }
+      if (fieldsEqual(fields, localFieldsNow, sheetFieldsNow)) return; // changed to the same thing on both sides
+      plan.conflicts.push({ id: id, kind: opts.kind, rowNumber: sheetRec.rowNumber, localFields: localFieldsNow, sheetFields: sheetFieldsNow });
+    });
+
+    sheetNew.forEach(function (r) { plan.pullNew.push({ rowNumber: r.rowNumber, fields: extractFields(fields, r) }); });
+
+    plan.pulledCount = 0;
+    plan.pushedCount = 0;
+    return plan;
+  }
+
+  function showSyncConflictModal(opts) {
+    return new Promise(function (resolve) {
+      var overlay = $("#syncConflictOverlay");
+      var localBtn = $("#syncConflictLocalBtn");
+      var sheetBtn = $("#syncConflictSheetBtn");
+      var skipBtn = $("#syncConflictSkipBtn");
+      $("#syncConflictTitleEl").textContent = opts.title;
+      $("#syncConflictText").textContent = opts.text;
+      localBtn.textContent = t("syncConflictKeepLocalBtn");
+      sheetBtn.textContent = t("syncConflictKeepSheetBtn");
+      skipBtn.textContent = t("syncConflictSkipBtn");
+      overlay.hidden = false;
+      localBtn.focus();
+      function cleanup(result) {
+        overlay.hidden = true;
+        localBtn.removeEventListener("click", onLocal);
+        sheetBtn.removeEventListener("click", onSheet);
+        skipBtn.removeEventListener("click", onSkip);
+        overlay.removeEventListener("click", onOverlay);
+        document.removeEventListener("keydown", onKey);
+        resolve(result);
+      }
+      function onLocal() { cleanup("local"); }
+      function onSheet() { cleanup("sheet"); }
+      function onSkip() { cleanup("skip"); }
+      function onOverlay(e) { if (e.target === overlay) cleanup("skip"); }
+      function onKey(e) { if (e.key === "Escape") cleanup("skip"); }
+      localBtn.addEventListener("click", onLocal);
+      sheetBtn.addEventListener("click", onSheet);
+      skipBtn.addEventListener("click", onSkip);
+      overlay.addEventListener("click", onOverlay);
+      document.addEventListener("keydown", onKey);
+    });
+  }
+  function resolveConflictsSequentially(items) {
+    var chain = Promise.resolve();
+    items.forEach(function (item) {
+      chain = chain.then(function () {
+        var c = item.conflict;
+        var label = c.kind === "contacts" ? (c.localFields.name || c.sheetFields.name || "?") : (c.localFields.subject || c.sheetFields.subject || "?");
+        var textKey = c.kind === "contacts" ? "syncConflictContactText" : "syncConflictLetterText";
+        var text = t(textKey)
+          .replace("{name}", label)
+          .replace("{local}", describeSyncFields(c.kind, c.localFields))
+          .replace("{sheet}", describeSyncFields(c.kind, c.sheetFields));
+        return showSyncConflictModal({ title: t("syncConflictTitle"), text: text }).then(function (choice) {
+          if (choice === "local") item.plan.pushUpdate.push({ id: c.id, rowNumber: c.rowNumber, fields: c.localFields });
+          else if (choice === "sheet") item.plan.pullUpdate.push({ id: c.id, fields: c.sheetFields });
+          // "skip" -> leave untouched; the snapshot stays as-is so it's asked again next sync.
+        });
+      });
+    });
+    return chain;
+  }
+
+  function createPulledRecord(kind, id, fields) {
+    if (kind === "contacts") {
+      state.contacts.push(Object.assign({ id: id }, fields));
+      lsSave(LS_KEYS.contacts, state.contacts);
+    } else {
+      state.letters.push(Object.assign({ id: id, extraEmails: "", toContactIds: [] }, fields));
+      lsSave(LS_KEYS.letters, state.letters);
+    }
+    return Promise.resolve();
+  }
+  function applyPulledFields(kind, id, fields) {
+    if (kind === "contacts") {
+      var c = state.contacts.find(function (x) { return x.id === id; });
+      if (c) Object.assign(c, fields);
+      lsSave(LS_KEYS.contacts, state.contacts);
+    } else {
+      var l = state.letters.find(function (x) { return x.id === id; });
+      if (l) Object.assign(l, fields);
+      lsSave(LS_KEYS.letters, state.letters);
+    }
+    return Promise.resolve();
+  }
+
+  function sheetsValuesUpdate(spreadsheetId, token, range, values) {
+    var url = "https://sheets.googleapis.com/v4/spreadsheets/" + encodeURIComponent(spreadsheetId) +
+      "/values/" + encodeURIComponent(range) + "?valueInputOption=RAW";
+    return fetch(url, {
+      method: "PUT",
+      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify({ range: range, majorDimension: "ROWS", values: values }),
+    }).then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); });
+  }
+  function sheetsValuesAppend(spreadsheetId, token, range, values) {
+    var url = "https://sheets.googleapis.com/v4/spreadsheets/" + encodeURIComponent(spreadsheetId) +
+      "/values/" + encodeURIComponent(range) + ":append?valueInputOption=RAW&insertDataOption=INSERT_ROWS";
+    return fetch(url, {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify({ range: range, majorDimension: "ROWS", values: values }),
+    }).then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); });
+  }
+
+  function applySyncPlan(kind, plan, sheetName, snapshotForKind, spreadsheetId, token) {
+    var fields = kind === "contacts" ? SYNC_CONTACT_FIELDS : SYNC_LETTER_FIELDS;
+    var lastCol = "F"; // both kinds now have 5 data fields + a trailing ID column (A-F)
+    function fieldsToRow(f) {
+      return fields.map(function (name) {
+        if (name === "personalize") return f.personalize === false ? "no" : "yes";
+        return f[name] || "";
+      });
+    }
+    var ops = [];
+
+    plan.pushUpdate.forEach(function (u) {
+      var row = fieldsToRow(u.fields).concat([u.id]);
+      ops.push(sheetsValuesUpdate(spreadsheetId, token, sheetName + "!A" + u.rowNumber + ":" + lastCol + u.rowNumber, [row]).then(function () {
+        snapshotForKind[u.id] = extractFields(fields, u.fields);
+      }));
+    });
+    plan.pushNew.forEach(function (n) {
+      var row = fieldsToRow(n.fields).concat([n.id]);
+      ops.push(sheetsValuesAppend(spreadsheetId, token, sheetName + "!A:" + lastCol, [row]).then(function () {
+        snapshotForKind[n.id] = extractFields(fields, n.fields);
+      }));
+    });
+    plan.pullUpdate.forEach(function (u) {
+      ops.push(applyPulledFields(kind, u.id, u.fields).then(function () {
+        snapshotForKind[u.id] = extractFields(fields, u.fields);
+      }));
+    });
+    plan.pullNew.forEach(function (n) {
+      var newId = n.existingId || genLocalId();
+      var created = createPulledRecord(kind, newId, n.fields);
+      if (n.existingId) {
+        ops.push(created.then(function () { snapshotForKind[newId] = extractFields(fields, n.fields); }));
+      } else {
+        ops.push(created.then(function () {
+          return sheetsValuesUpdate(spreadsheetId, token, sheetName + "!" + lastCol + n.rowNumber, [[newId]]);
+        }).then(function () {
+          snapshotForKind[newId] = extractFields(fields, n.fields);
+        }));
+      }
+    });
+    plan.retire.forEach(function (id) { delete snapshotForKind[id]; });
+
+    plan.pulledCount = plan.pullNew.length + plan.pullUpdate.length;
+    plan.pushedCount = plan.pushNew.length + plan.pushUpdate.length;
+    return Promise.all(ops);
+  }
+
   (function initSyncTab() {
     var clientIdEl = $("#syncClientId");
     var spreadsheetIdEl = $("#syncSpreadsheetId");
     var contactsRangeEl = $("#syncContactsRange");
     var lettersRangeEl = $("#syncLettersRange");
+    var adminsRangeEl = $("#syncAdminsRange");
     var saveBtn = $("#syncSaveConfigBtn");
     var signInBtn = $("#syncSignInBtn");
     var signOutBtn = $("#syncSignOutBtn");
     var authStatusEl = $("#syncAuthStatus");
+    var roleStatusEl = $("#syncRoleStatus");
     var syncNowBtn = $("#syncNowBtn");
     var lastRunEl = $("#syncLastRun");
     var msgEl = $("#syncMsg");
@@ -4291,12 +4757,19 @@
     spreadsheetIdEl.value = state.syncConfig.spreadsheetId;
     contactsRangeEl.value = state.syncConfig.contactsRange;
     lettersRangeEl.value = state.syncConfig.lettersRange;
+    if (adminsRangeEl) adminsRangeEl.value = state.syncConfig.adminsRange;
 
     var tokenClient = null;
 
     function setAuthStatus(key, cls) {
       authStatusEl.textContent = t(key);
       authStatusEl.className = "hint" + (cls ? " " + cls : "");
+    }
+    function setRoleStatus() {
+      if (!roleStatusEl) return;
+      if (!state.syncUserEmail) { roleStatusEl.textContent = ""; roleStatusEl.className = "hint"; return; }
+      roleStatusEl.textContent = t(state.syncIsAdmin ? "syncRoleAdmin" : "syncRoleReadOnly").replace("{name}", state.syncUserEmail);
+      roleStatusEl.className = "hint" + (state.syncIsAdmin ? "" : " warn");
     }
     function haveToken() {
       return !!state.syncAccessToken && Date.now() < state.syncTokenExpiresAt;
@@ -4311,6 +4784,7 @@
         spreadsheetId: spreadsheetIdEl.value.trim(),
         contactsRange: contactsRangeEl.value.trim(),
         lettersRange: lettersRangeEl.value.trim(),
+        adminsRange: adminsRangeEl ? adminsRangeEl.value.trim() : "",
       };
       saveSyncConfigToStorage(state.syncConfig);
       msgEl.innerHTML = '<div class="status-msg">' + esc(t("sheetsConfigSavedMsg")) + '</div>';
@@ -4336,6 +4810,40 @@
       });
     }
 
+    function fetchRange(range) {
+      var url = "https://sheets.googleapis.com/v4/spreadsheets/" + encodeURIComponent(state.syncConfig.spreadsheetId) +
+        "/values/" + encodeURIComponent(range);
+      return fetch(url, { headers: { Authorization: "Bearer " + state.syncAccessToken } }).then(function (r) {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      }).then(function (data) { return data.values || []; });
+    }
+    function fetchUserEmail() {
+      return fetch("https://www.googleapis.com/oauth2/v3/userinfo", { headers: { Authorization: "Bearer " + state.syncAccessToken } })
+        .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+        .then(function (data) { return (data && data.email) || ""; })
+        .catch(function () { return ""; });
+    }
+    function fetchAdminEmails() {
+      if (!state.syncConfig.adminsRange) return Promise.resolve([]);
+      return fetchRange(state.syncConfig.adminsRange).then(function (rows) {
+        var out = [];
+        rows.forEach(function (r) {
+          var v = (r[0] || "").trim().toLowerCase();
+          if (v && v.indexOf("@") !== -1) out.push(v);
+        });
+        return out;
+      }).catch(function () { return []; }); // missing/renamed Admins tab -> fail safe to "no admins", never block sync
+    }
+    function refreshSyncRole() {
+      return Promise.all([fetchUserEmail(), fetchAdminEmails()]).then(function (results) {
+        state.syncUserEmail = results[0];
+        var admins = results[1];
+        state.syncIsAdmin = !!state.syncUserEmail && admins.indexOf(state.syncUserEmail.toLowerCase()) !== -1;
+        setRoleStatus();
+      });
+    }
+
     signInBtn.addEventListener("click", function () {
       if (!state.syncConfig.clientId) {
         msgEl.innerHTML = '<div class="status-msg warn">' + esc(t("syncConfigNeededWarn")) + '</div>';
@@ -4355,6 +4863,7 @@
                 signInBtn.hidden = true;
                 signOutBtn.hidden = false;
                 refreshSyncNowEnabled();
+                refreshSyncRole();
               } else {
                 setAuthStatus("syncNotSignedInMsg", "warn");
               }
@@ -4375,22 +4884,110 @@
       var token = state.syncAccessToken;
       state.syncAccessToken = null;
       state.syncTokenExpiresAt = 0;
+      state.syncUserEmail = "";
+      state.syncIsAdmin = false;
       signInBtn.hidden = false;
       signOutBtn.hidden = true;
       setAuthStatus("syncNotSignedInMsg");
+      setRoleStatus();
       refreshSyncNowEnabled();
       if (token && window.google && window.google.accounts && window.google.accounts.oauth2) {
         try { window.google.accounts.oauth2.revoke(token, function () {}); } catch (e) {}
       }
     });
 
-    function fetchRange(range) {
-      var url = "https://sheets.googleapis.com/v4/spreadsheets/" + encodeURIComponent(state.syncConfig.spreadsheetId) +
-        "/values/" + encodeURIComponent(range);
-      return fetch(url, { headers: { Authorization: "Bearer " + state.syncAccessToken } }).then(function (r) {
-        if (!r.ok) throw new Error(String(r.status));
-        return r.json();
-      }).then(function (data) { return data.values || []; });
+    // ----- one-way path (non-admins): unchanged Stage 1 behavior -----
+    function runOneWaySync() {
+      var contactsP = state.syncConfig.contactsRange ? fetchRange(state.syncConfig.contactsRange) : Promise.resolve([]);
+      var lettersP = state.syncConfig.lettersRange ? fetchRange(state.syncConfig.lettersRange) : Promise.resolve([]);
+
+      return Promise.all([contactsP, lettersP]).then(function (results) {
+        var contactEntries = parseImportRows(results[0]);
+        var letterEntries = parseImportLetterRows(results[1]);
+        var total = contactEntries.length + letterEntries.length;
+        if (!total) {
+          msgEl.innerHTML = '<div class="status-msg warn">' + esc(t("importFailedMsg")) + '</div>';
+          return;
+        }
+        return showConfirmModal({
+          title: t("confirmImportTitle"),
+          text: tn("syncConfirmText", total),
+          saveLabel: t("confirmImportKeepBtn"),
+          discardLabel: t("confirmImportCancelBtn"),
+        }).then(function (shouldImport) {
+          if (!shouldImport) return;
+          var addedContacts = commitImportedRows(contactEntries);
+          var addedLetters = commitImportedLetterRows(letterEntries);
+          renderContacts();
+          renderLetters();
+          lastRunEl.textContent = t("syncLastRunPrefix") + new Date().toLocaleString();
+          msgEl.innerHTML = '<div class="status-msg">' + esc(tn("syncDoneMsg", addedContacts + addedLetters)) + '</div>';
+        });
+      });
+    }
+
+    // ----- two-way path (admins): pull + push + conflict prompts -----
+    function runTwoWaySync() {
+      var snapshotAll = loadSyncSnapshot();
+      var tombAll = loadSyncTombstones();
+      var spreadsheetId = state.syncConfig.spreadsheetId;
+      var token = state.syncAccessToken;
+
+      var contactsSheetName = state.syncConfig.contactsRange ? state.syncConfig.contactsRange.split("!")[0] : "";
+      var lettersSheetName = state.syncConfig.lettersRange ? state.syncConfig.lettersRange.split("!")[0] : "";
+      // The exact column span typed into the config field only matters for
+      // the one-way path above — here we always read/write the fixed
+      // columns the two-way engine needs (through the hidden ID column),
+      // so a stale "…!A:D" range left over from Stage 1 can't silently
+      // hide the ID column from this engine.
+      var contactsP = contactsSheetName ? fetchRange(contactsSheetName + "!A:F") : Promise.resolve([]);
+      var lettersP = lettersSheetName ? fetchRange(lettersSheetName + "!A:F") : Promise.resolve([]);
+
+      return Promise.all([contactsP, lettersP]).then(function (results) {
+        var contactPlan = buildSyncPlan({
+          kind: "contacts", fields: SYNC_CONTACT_FIELDS, localRecords: state.contacts,
+          sheetRows: parseSyncContactsRows(results[0]), snapshot: snapshotAll.contacts, tombstones: tombAll.contacts,
+        });
+        var letterPlan = buildSyncPlan({
+          kind: "letters", fields: SYNC_LETTER_FIELDS, localRecords: state.letters,
+          sheetRows: parseSyncLettersRows(results[1]), snapshot: snapshotAll.letters, tombstones: tombAll.letters,
+        });
+
+        var changeTotal = contactPlan.pushNew.length + contactPlan.pushUpdate.length + contactPlan.pullNew.length + contactPlan.pullUpdate.length
+          + letterPlan.pushNew.length + letterPlan.pushUpdate.length + letterPlan.pullNew.length + letterPlan.pullUpdate.length;
+        var conflictCount = contactPlan.conflicts.length + letterPlan.conflicts.length;
+
+        if (!changeTotal && !conflictCount) {
+          lastRunEl.textContent = t("syncLastRunPrefix") + new Date().toLocaleString();
+          msgEl.innerHTML = '<div class="status-msg">' + esc(t("syncNothingToDoMsg")) + '</div>';
+          return;
+        }
+
+        return showConfirmModal({
+          title: t("confirmImportTitle"),
+          text: tn("syncTwoWaySummaryText", changeTotal) + (conflictCount ? " " + tn("syncTwoWayConflictsSuffix", conflictCount) : ""),
+          saveLabel: t("confirmImportKeepBtn"),
+          discardLabel: t("confirmImportCancelBtn"),
+        }).then(function (proceed) {
+          if (!proceed) return;
+          var conflictItems = contactPlan.conflicts.map(function (c) { return { plan: contactPlan, conflict: c }; })
+            .concat(letterPlan.conflicts.map(function (c) { return { plan: letterPlan, conflict: c }; }));
+
+          return resolveConflictsSequentially(conflictItems).then(function () {
+            return applySyncPlan("contacts", contactPlan, contactsSheetName || "Contacts", snapshotAll.contacts, spreadsheetId, token);
+          }).then(function () {
+            return applySyncPlan("letters", letterPlan, lettersSheetName || "Letters", snapshotAll.letters, spreadsheetId, token);
+          }).then(function () {
+            saveSyncSnapshot(snapshotAll);
+            saveSyncTombstonesToStorage(tombAll);
+            renderContacts();
+            renderLetters();
+            var total = contactPlan.pulledCount + letterPlan.pulledCount + contactPlan.pushedCount + letterPlan.pushedCount;
+            lastRunEl.textContent = t("syncLastRunPrefix") + new Date().toLocaleString();
+            msgEl.innerHTML = '<div class="status-msg">' + esc(tn("syncTwoWayDoneMsg", total)) + '</div>';
+          });
+        });
+      });
     }
 
     syncNowBtn.addEventListener("click", function () {
@@ -4406,35 +5003,11 @@
       refreshSyncNowEnabled();
       msgEl.innerHTML = '<div class="status-msg">' + esc(t("syncRunningMsg")) + '</div>';
 
-      var contactsP = state.syncConfig.contactsRange ? fetchRange(state.syncConfig.contactsRange) : Promise.resolve([]);
-      var lettersP = state.syncConfig.lettersRange ? fetchRange(state.syncConfig.lettersRange) : Promise.resolve([]);
-
-      Promise.all([contactsP, lettersP]).then(function (results) {
-        var contactEntries = parseImportRows(results[0]);
-        var letterEntries = parseImportLetterRows(results[1]);
-        var total = contactEntries.length + letterEntries.length;
-        if (!total) {
-          state.syncRunning = false;
-          refreshSyncNowEnabled();
-          msgEl.innerHTML = '<div class="status-msg warn">' + esc(t("importFailedMsg")) + '</div>';
-          return;
-        }
-        showConfirmModal({
-          title: t("confirmImportTitle"),
-          text: tn("syncConfirmText", total),
-          saveLabel: t("confirmImportKeepBtn"),
-          discardLabel: t("confirmImportCancelBtn"),
-        }).then(function (shouldImport) {
-          state.syncRunning = false;
-          refreshSyncNowEnabled();
-          if (!shouldImport) return;
-          var addedContacts = commitImportedRows(contactEntries);
-          var addedLetters = commitImportedLetterRows(letterEntries);
-          renderContacts();
-          renderLetters();
-          lastRunEl.textContent = t("syncLastRunPrefix") + new Date().toLocaleString();
-          msgEl.innerHTML = '<div class="status-msg">' + esc(tn("syncDoneMsg", addedContacts + addedLetters)) + '</div>';
-        });
+      refreshSyncRole().then(function () {
+        return state.syncIsAdmin ? runTwoWaySync() : runOneWaySync();
+      }).then(function () {
+        state.syncRunning = false;
+        refreshSyncNowEnabled();
       }).catch(function (err) {
         state.syncRunning = false;
         refreshSyncNowEnabled();
@@ -4453,7 +5026,6 @@
   composeSubjectEditor.render();
 })();
 </script>
-
 
 
 </body>
